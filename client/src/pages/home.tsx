@@ -186,14 +186,16 @@ function OrderCardSkeleton() {
 }
 
 
-function LineItemSizeEntry({ lineItem, qtyMap, onQtyChange, expanded, onToggle }: {
+function LineItemSizeEntry({ lineItem, qtyMap, onQtyChange, expanded, onToggle, fallbackMockupUrl }: {
   lineItem: LineItem;
   qtyMap: Record<string, number>;
   onQtyChange: (size: string, qty: number) => void;
   expanded: boolean;
   onToggle: () => void;
+  fallbackMockupUrl?: string | null;
 }) {
   const productLabel = lineItem.productName || lineItem.description || "Product";
+  const mockupSrc = lineItem.mockupUrl || fallbackMockupUrl || null;
   const sizesWithLabels = (lineItem.sizes || []).map(s => ({
     ...s,
     label: SIZE_LABEL_MAP[s.size] || s.size,
@@ -209,7 +211,30 @@ function LineItemSizeEntry({ lineItem, qtyMap, onQtyChange, expanded, onToggle }
         className={`w-full text-left px-3 py-2.5 transition-colors ${expanded ? "bg-primary/5" : "bg-background hover:bg-muted/50"}`}
         data-testid={`toggle-lineitem-${lineItem.id}`}
       >
-        <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-3">
+          {mockupSrc ? (
+            <div className="relative group/mockup shrink-0" onClick={(e) => e.stopPropagation()}>
+              <img
+                src={mockupSrc}
+                alt={productLabel}
+                className="w-10 h-10 rounded object-cover border border-border/50 cursor-zoom-in"
+                data-testid={`img-mockup-${lineItem.id}`}
+              />
+              <div className="hidden group-hover/mockup:block fixed z-[100] pointer-events-none" style={{ top: "50%", left: "50%", transform: "translate(-50%, -50%)" }}>
+                <div className="p-1.5 bg-white dark:bg-zinc-900 rounded-lg shadow-2xl border border-border">
+                  <img
+                    src={mockupSrc}
+                    alt={productLabel}
+                    className="w-56 h-56 rounded object-contain"
+                  />
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="w-10 h-10 rounded border border-border/50 bg-muted/30 flex items-center justify-center shrink-0">
+              <Image className="w-4 h-4 text-muted-foreground/40" />
+            </div>
+          )}
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-sm font-medium truncate">{productLabel}</span>
@@ -419,6 +444,7 @@ function ReorderModal({ order, open, onClose }: { order: PrintavoOrder | null; o
                       onQtyChange={(size, qty) => handleQtyChange(li.id, size, qty)}
                       expanded={expandedItems.has(li.id)}
                       onToggle={() => toggleItem(li.id)}
+                      fallbackMockupUrl={order.mockupUrl}
                     />
                   ))}
                 </div>
