@@ -58,9 +58,8 @@ function StatusFilterBar({ statuses, activeStatusIds, onToggle }: {
   );
 }
 
-function OrderCard({ order, onViewInvoice, onReorder }: {
+function OrderCard({ order, onReorder }: {
   order: PrintavoOrder;
-  onViewInvoice: (url: string) => void;
   onReorder: (order: PrintavoOrder) => void;
 }) {
   return (
@@ -134,7 +133,7 @@ function OrderCard({ order, onViewInvoice, onReorder }: {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => onViewInvoice(order.publicUrl!)}
+                  onClick={() => window.open(order.publicUrl!, "_blank")}
                   data-testid={`button-invoice-${order.visualId}`}
                 >
                   <ExternalLink className="w-3.5 h-3.5 mr-1.5" />
@@ -186,52 +185,6 @@ function OrderCardSkeleton() {
   );
 }
 
-function InvoiceModal({ url, open, onClose }: { url: string; open: boolean; onClose: () => void }) {
-  const [iframeError, setIframeError] = useState(false);
-
-  useEffect(() => {
-    if (open) setIframeError(false);
-  }, [open, url]);
-
-  return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl w-[95vw] h-[85vh] p-0 flex flex-col" data-testid="invoice-modal">
-        <DialogHeader className="px-6 pt-6 pb-2">
-          <DialogTitle className="flex items-center gap-2">
-            <ExternalLink className="w-4 h-4" />
-            Invoice Details
-          </DialogTitle>
-          <DialogDescription>
-            View your complete order invoice below
-          </DialogDescription>
-        </DialogHeader>
-        <div className="flex-1 px-6 pb-6 min-h-0">
-          {iframeError ? (
-            <div className="w-full h-full rounded-md border flex flex-col items-center justify-center gap-4 text-center p-8">
-              <ExternalLink className="w-10 h-10 text-muted-foreground/40" />
-              <p className="text-muted-foreground">Unable to display invoice inline.</p>
-              <Button
-                onClick={() => window.open(url, "_blank")}
-                data-testid="button-open-invoice-new-tab"
-              >
-                <ExternalLink className="w-3.5 h-3.5 mr-1.5" />
-                Open in New Tab
-              </Button>
-            </div>
-          ) : (
-            <iframe
-              src={url}
-              className="w-full h-full rounded-md border"
-              title="Printavo Invoice"
-              onError={() => setIframeError(true)}
-              data-testid="invoice-iframe"
-            />
-          )}
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
 
 function ReorderModal({ order, open, onClose }: { order: PrintavoOrder | null; open: boolean; onClose: () => void }) {
   const { toast } = useToast();
@@ -348,7 +301,6 @@ export default function Home() {
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState<{ value: string; type: "email" | "company" } | null>(null);
   const [activeStatusIds, setActiveStatusIds] = useState<Set<string>>(new Set());
-  const [invoiceUrl, setInvoiceUrl] = useState<string | null>(null);
   const [reorderOrder, setReorderOrder] = useState<PrintavoOrder | null>(null);
   const [statusesInitialized, setStatusesInitialized] = useState(false);
 
@@ -575,7 +527,6 @@ export default function Home() {
               <OrderCard
                 key={order.id}
                 order={order}
-                onViewInvoice={(url) => setInvoiceUrl(url)}
                 onReorder={(o) => setReorderOrder(o)}
               />
             ))}
@@ -583,11 +534,6 @@ export default function Home() {
         )}
       </main>
 
-      <InvoiceModal
-        url={invoiceUrl || ""}
-        open={!!invoiceUrl}
-        onClose={() => setInvoiceUrl(null)}
-      />
       <ReorderModal
         order={reorderOrder}
         open={!!reorderOrder}
