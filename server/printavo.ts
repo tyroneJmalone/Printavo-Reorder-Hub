@@ -55,7 +55,7 @@ export async function getStatuses() {
 export async function getOrdersBySearch(searchValue: string, searchType: "email" | "company") {
   const gql = `
     query($searchQuery: String) {
-      invoices(first: 25, sortOn: VISUAL_ID, sortDescending: true, query: $searchQuery) {
+      invoices(first: 15, sortOn: VISUAL_ID, sortDescending: true, query: $searchQuery) {
         nodes {
           id
           visualId
@@ -78,25 +78,29 @@ export async function getOrdersBySearch(searchValue: string, searchType: "email"
               companyName
             }
           }
-          lineItemGroups(first: 3) {
+          lineItemGroups(first: 5) {
             nodes {
-              lineItems(first: 3) {
+              lineItems(first: 8) {
                 nodes {
                   id
+                  description
+                  color
+                  itemNumber
+                  items
+                  category { name }
+                  product { brand description itemNumber }
+                  sizes { size count }
                   mockups(first: 1) {
                     nodes {
-                      id
                       fullImageUrl
                     }
                   }
                 }
               }
-              imprints(first: 3) {
+              imprints(first: 1) {
                 nodes {
-                  id
                   mockups(first: 1) {
                     nodes {
-                      id
                       fullImageUrl
                     }
                   }
@@ -125,31 +129,40 @@ export async function getOrdersBySearch(searchValue: string, searchType: "email"
   return customerOrders.map((order: any) => {
     let mockupUrl: string | null = null;
     const groups = order.lineItemGroups?.nodes || [];
+
+    const lineItems: any[] = [];
     for (const group of groups) {
       const imprints = group.imprints?.nodes || [];
       for (const imprint of imprints) {
         const mockups = imprint.mockups?.nodes || [];
-        if (mockups.length > 0) {
+        if (mockups.length > 0 && !mockupUrl) {
           mockupUrl = mockups[0].fullImageUrl;
-          break;
         }
       }
-      if (mockupUrl) break;
 
-      const lineItems = group.lineItems?.nodes || [];
-      for (const li of lineItems) {
-        const mockups = li.mockups?.nodes || [];
-        if (mockups.length > 0) {
-          mockupUrl = mockups[0].fullImageUrl;
-          break;
+      const groupItems = group.lineItems?.nodes || [];
+      for (const li of groupItems) {
+        const liMockups = li.mockups?.nodes || [];
+        const liMockupUrl = liMockups.length > 0 ? liMockups[0].fullImageUrl : null;
+        if (liMockupUrl && !mockupUrl) {
+          mockupUrl = liMockupUrl;
         }
-      }
-      if (mockupUrl) break;
-    }
 
-    let lineItemCount = 0;
-    for (const group of groups) {
-      lineItemCount += (group.lineItems?.nodes?.length || 0);
+        const activeSizes = (li.sizes || []).filter((s: any) => s.count != null && s.count > 0);
+
+        lineItems.push({
+          id: li.id,
+          description: li.description || null,
+          color: li.color || li.product?.color || null,
+          itemNumber: li.itemNumber || li.product?.itemNumber || null,
+          brand: li.product?.brand || null,
+          productName: li.product?.description || null,
+          category: li.category?.name || null,
+          totalQty: li.items || 0,
+          sizes: activeSizes.map((s: any) => ({ size: s.size, count: s.count })),
+          mockupUrl: liMockupUrl,
+        });
+      }
     }
 
     return {
@@ -167,7 +180,8 @@ export async function getOrdersBySearch(searchValue: string, searchType: "email"
       createdAt: order.createdAt,
       publicUrl: order.publicUrl || null,
       mockupUrl,
-      lineItemCount,
+      lineItemCount: lineItems.length,
+      lineItems,
     };
   });
 }

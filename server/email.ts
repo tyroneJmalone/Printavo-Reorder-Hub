@@ -81,25 +81,6 @@ export async function sendReorderEmail(request: ReorderRequest) {
               <td style="padding: 8px 0; font-weight: 600; font-size: 14px;">${request.customerEmail}</td>
             </tr>
             ${
-              request.sizes && request.sizes.length > 0
-                ? `<tr>
-              <td style="padding: 8px 0; color: #64748b; font-size: 14px; vertical-align: top;">Sizes</td>
-              <td style="padding: 8px 0; font-size: 14px;">
-                <table style="border-collapse: collapse; width: 100%;">
-                  ${request.sizes.map(s => `<tr>
-                    <td style="padding: 2px 12px 2px 0; font-size: 13px;">${s.size}</td>
-                    <td style="padding: 2px 0; font-size: 13px; font-weight: 600;">× ${s.qty}</td>
-                  </tr>`).join("")}
-                  <tr style="border-top: 1px solid #e2e8f0;">
-                    <td style="padding: 6px 12px 2px 0; font-size: 13px; font-weight: 600;">Total</td>
-                    <td style="padding: 6px 0 2px; font-size: 13px; font-weight: 600;">× ${request.sizes.reduce((sum, s) => sum + s.qty, 0)}</td>
-                  </tr>
-                </table>
-              </td>
-            </tr>`
-                : ""
-            }
-            ${
               request.notes
                 ? `<tr>
               <td style="padding: 8px 0; color: #64748b; font-size: 14px; vertical-align: top;">Notes</td>
@@ -108,6 +89,35 @@ export async function sendReorderEmail(request: ReorderRequest) {
                 : ""
             }
           </table>
+
+          ${
+            request.lineItemOrders && request.lineItemOrders.length > 0
+              ? `<div style="margin-top: 16px; border-top: 2px solid #e2e8f0; padding-top: 16px;">
+              <h3 style="margin: 0 0 12px; font-size: 15px; color: #1e293b;">Reorder Details by Product</h3>
+              ${request.lineItemOrders.map(li => `
+                <div style="background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; margin-bottom: 8px;">
+                  <div style="font-weight: 600; font-size: 14px; color: #1e293b;">${li.productName || "Product"}</div>
+                  <div style="font-size: 12px; color: #64748b; margin-top: 2px;">
+                    ${[li.color, li.itemNumber ? "#" + li.itemNumber : null].filter(Boolean).join(" · ")}
+                  </div>
+                  <table style="border-collapse: collapse; width: 100%; margin-top: 8px;">
+                    ${li.sizes.map(s => `<tr>
+                      <td style="padding: 2px 12px 2px 0; font-size: 13px;">${s.size}</td>
+                      <td style="padding: 2px 0; font-size: 13px; font-weight: 600;">× ${s.qty}</td>
+                    </tr>`).join("")}
+                    <tr style="border-top: 1px solid #e2e8f0;">
+                      <td style="padding: 4px 12px 2px 0; font-size: 13px; font-weight: 600;">Subtotal</td>
+                      <td style="padding: 4px 0 2px; font-size: 13px; font-weight: 600;">× ${li.sizes.reduce((sum, s) => sum + s.qty, 0)}</td>
+                    </tr>
+                  </table>
+                </div>
+              `).join("")}
+              <div style="text-align: right; font-size: 14px; font-weight: 600; color: #1e293b; margin-top: 8px;">
+                Grand Total: ${request.lineItemOrders.reduce((sum, li) => sum + li.sizes.reduce((s, sz) => s + sz.qty, 0), 0)} pcs
+              </div>
+            </div>`
+              : ""
+          }
         </div>
 
         <p style="text-align: center; color: #94a3b8; font-size: 12px; margin-top: 16px;">

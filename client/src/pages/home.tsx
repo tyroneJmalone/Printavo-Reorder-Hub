@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { customerLookupSchema, type CustomerLookup, type PrintavoOrder, type PrintavoStatus, type ReorderRequest, type SizeQuantity, SIZE_CATEGORIES } from "@shared/schema";
+import { customerLookupSchema, type CustomerLookup, type PrintavoOrder, type PrintavoStatus, type ReorderRequest, type LineItem, type LineItemReorder, SIZE_LABEL_MAP } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -186,33 +186,88 @@ function OrderCardSkeleton() {
 }
 
 
-type CategoryKey = keyof typeof SIZE_CATEGORIES;
-
-function SizeCategorySection({ categoryKey, sizes, sizeQtys, onQtyChange }: {
-  categoryKey: string;
-  sizes: readonly string[];
-  sizeQtys: Record<string, number>;
+function LineItemSizeEntry({ lineItem, qtyMap, onQtyChange, expanded, onToggle }: {
+  lineItem: LineItem;
+  qtyMap: Record<string, number>;
   onQtyChange: (size: string, qty: number) => void;
+  expanded: boolean;
+  onToggle: () => void;
 }) {
+  const productLabel = lineItem.productName || lineItem.description || "Product";
+  const sizesWithLabels = (lineItem.sizes || []).map(s => ({
+    ...s,
+    label: SIZE_LABEL_MAP[s.size] || s.size,
+  }));
+  const hasSizes = sizesWithLabels.length > 0;
+  const itemTotal = Object.values(qtyMap).reduce((sum, q) => sum + q, 0);
+
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-2">
-      {sizes.map((size) => {
-        const shortLabel = size.replace(/^(Unisex|Youth|Ladies|Adult)\s+/, "");
-        return (
-          <div key={size} className="flex items-center gap-2">
-            <label className="text-xs text-muted-foreground w-10 shrink-0">{shortLabel}</label>
-            <Input
-              type="number"
-              min={0}
-              value={sizeQtys[size] || ""}
-              onChange={(e) => onQtyChange(size, parseInt(e.target.value) || 0)}
-              className="h-7 text-sm px-2 w-16"
-              placeholder="0"
-              data-testid={`input-qty-${size.replace(/\s+/g, "-").toLowerCase()}`}
-            />
+    <div className="rounded-md border overflow-hidden" data-testid={`lineitem-${lineItem.id}`}>
+      <button
+        type="button"
+        onClick={onToggle}
+        className={`w-full text-left px-3 py-2.5 transition-colors ${expanded ? "bg-primary/5" : "bg-background hover:bg-muted/50"}`}
+        data-testid={`toggle-lineitem-${lineItem.id}`}
+      >
+        <div className="flex items-center justify-between gap-2">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-sm font-medium truncate">{productLabel}</span>
+              {itemTotal > 0 && (
+                <Badge variant="secondary" className="text-xs shrink-0">{itemTotal} pcs</Badge>
+              )}
+            </div>
+            <div className="flex items-center gap-2 mt-0.5 text-xs text-muted-foreground flex-wrap">
+              {lineItem.color && <span>{lineItem.color}</span>}
+              {lineItem.itemNumber && <span>#{lineItem.itemNumber}</span>}
+              {lineItem.totalQty !== undefined && lineItem.totalQty > 0 && (
+                <span className="text-muted-foreground/60">(prev: {lineItem.totalQty})</span>
+              )}
+            </div>
           </div>
-        );
-      })}
+          <ChevronDown className={`w-4 h-4 shrink-0 text-muted-foreground transition-transform ${expanded ? "rotate-180" : ""}`} />
+        </div>
+      </button>
+      {expanded && (
+        <div className="px-3 pb-3 bg-muted/20">
+          {hasSizes ? (
+            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 pt-2">
+              {sizesWithLabels.map((s) => (
+                <div key={s.size} className="flex flex-col items-center gap-1">
+                  <label className="text-xs text-muted-foreground">{s.label}</label>
+                  <Input
+                    type="number"
+                    min={0}
+                    value={qtyMap[s.size] || ""}
+                    onChange={(e) => onQtyChange(s.size, parseInt(e.target.value) || 0)}
+                    className="h-7 text-sm px-2 w-14 text-center"
+                    placeholder={s.count ? String(s.count) : "0"}
+                    data-testid={`input-qty-${lineItem.id}-${s.size}`}
+                  />
+                  {s.count != null && s.count > 0 && (
+                    <span className="text-[10px] text-muted-foreground/50">was {s.count}</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="pt-2">
+              <div className="flex items-center gap-2">
+                <label className="text-xs text-muted-foreground">Qty</label>
+                <Input
+                  type="number"
+                  min={0}
+                  value={qtyMap["qty"] || ""}
+                  onChange={(e) => onQtyChange("qty", parseInt(e.target.value) || 0)}
+                  className="h-7 text-sm px-2 w-20"
+                  placeholder={lineItem.totalQty ? String(lineItem.totalQty) : "0"}
+                  data-testid={`input-qty-${lineItem.id}-qty`}
+                />
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -220,14 +275,14 @@ function SizeCategorySection({ categoryKey, sizes, sizeQtys, onQtyChange }: {
 function ReorderModal({ order, open, onClose }: { order: PrintavoOrder | null; open: boolean; onClose: () => void }) {
   const { toast } = useToast();
   const [notes, setNotes] = useState("");
-  const [activeCategories, setActiveCategories] = useState<Set<CategoryKey>>(new Set());
-  const [sizeQtys, setSizeQtys] = useState<Record<string, number>>({});
+  const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
+  const [lineItemQtys, setLineItemQtys] = useState<Record<string, Record<string, number>>>({});
 
   useEffect(() => {
     if (open) {
       setNotes("");
-      setActiveCategories(new Set());
-      setSizeQtys({});
+      setExpandedItems(new Set());
+      setLineItemQtys({});
     }
   }, [open]);
 
@@ -254,38 +309,47 @@ function ReorderModal({ order, open, onClose }: { order: PrintavoOrder | null; o
 
   if (!order) return null;
 
-  const toggleCategory = (key: CategoryKey) => {
-    setActiveCategories((prev) => {
+  const lineItems = order.lineItems || [];
+
+  const toggleItem = (id: string) => {
+    setExpandedItems((prev) => {
       const next = new Set(prev);
-      if (next.has(key)) {
-        next.delete(key);
-        const catSizes = SIZE_CATEGORIES[key].sizes;
-        const newQtys = { ...sizeQtys };
-        catSizes.forEach((s) => delete newQtys[s]);
-        setSizeQtys(newQtys);
-      } else {
-        next.add(key);
-      }
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
       return next;
     });
   };
 
-  const handleQtyChange = (size: string, qty: number) => {
-    setSizeQtys((prev) => {
+  const handleQtyChange = (lineItemId: string, size: string, qty: number) => {
+    setLineItemQtys((prev) => {
+      const itemQtys = { ...(prev[lineItemId] || {}) };
       if (qty <= 0) {
-        const next = { ...prev };
-        delete next[size];
-        return next;
+        delete itemQtys[size];
+      } else {
+        itemQtys[size] = qty;
       }
-      return { ...prev, [size]: qty };
+      return { ...prev, [lineItemId]: itemQtys };
     });
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const filledSizes: SizeQuantity[] = Object.entries(sizeQtys)
-      .filter(([, qty]) => qty > 0)
-      .map(([size, qty]) => ({ size, qty }));
+    const lineItemOrders: LineItemReorder[] = [];
+    for (const li of lineItems) {
+      const qtys = lineItemQtys[li.id] || {};
+      const filledSizes = Object.entries(qtys)
+        .filter(([, qty]) => qty > 0)
+        .map(([size, qty]) => ({ size: SIZE_LABEL_MAP[size] || size, qty }));
+      if (filledSizes.length > 0) {
+        lineItemOrders.push({
+          lineItemId: li.id,
+          productName: li.productName || li.description || undefined,
+          color: li.color || undefined,
+          itemNumber: li.itemNumber || undefined,
+          sizes: filledSizes,
+        });
+      }
+    }
 
     reorderMutation.mutate({
       orderId: order.id,
@@ -294,16 +358,18 @@ function ReorderModal({ order, open, onClose }: { order: PrintavoOrder | null; o
       customerName: order.customerName || undefined,
       customerEmail: order.customerEmail || "",
       notes: notes || undefined,
-      sizes: filledSizes.length > 0 ? filledSizes : undefined,
+      lineItemOrders: lineItemOrders.length > 0 ? lineItemOrders : undefined,
     });
   };
 
-  const totalQty = Object.values(sizeQtys).reduce((sum, q) => sum + q, 0);
+  const totalQty = Object.values(lineItemQtys).reduce(
+    (sum, qtys) => sum + Object.values(qtys).reduce((s, q) => s + q, 0), 0
+  );
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto" data-testid="reorder-modal">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-lg max-h-[90vh] flex flex-col p-0" data-testid="reorder-modal">
+        <DialogHeader className="px-6 pt-6 pb-2">
           <DialogTitle className="flex items-center gap-2">
             <RotateCcw className="w-4 h-4" />
             Reorder Request
@@ -313,8 +379,8 @@ function ReorderModal({ order, open, onClose }: { order: PrintavoOrder | null; o
             <strong>{order.orderNickname || `Order #${order.visualId}`}</strong>.
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit}>
-          <div className="space-y-4 py-2">
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
+          <div className="flex-1 overflow-y-auto px-6 space-y-4 py-2">
             <div className="rounded-md bg-muted/50 p-3 space-y-1.5 text-sm">
               <div className="flex justify-between gap-2">
                 <span className="text-muted-foreground">Order</span>
@@ -334,42 +400,30 @@ function ReorderModal({ order, open, onClose }: { order: PrintavoOrder | null; o
               )}
             </div>
 
-            <div className="space-y-3">
-              <label className="text-sm font-medium leading-none">Sizes & Quantities (optional)</label>
-              <div className="space-y-2">
-                {(Object.entries(SIZE_CATEGORIES) as [CategoryKey, typeof SIZE_CATEGORIES[CategoryKey]][]).map(([key, cat]) => {
-                  const isActive = activeCategories.has(key);
-                  return (
-                    <div key={key} className="rounded-md border overflow-hidden">
-                      <button
-                        type="button"
-                        onClick={() => toggleCategory(key)}
-                        className={`w-full flex items-center justify-between px-3 py-2.5 text-sm font-medium transition-colors ${isActive ? "bg-primary/5 text-foreground" : "bg-background text-muted-foreground hover:bg-muted/50"}`}
-                        data-testid={`toggle-category-${key}`}
-                      >
-                        <span>{cat.label}</span>
-                        <ChevronDown className={`w-4 h-4 transition-transform ${isActive ? "rotate-180" : ""}`} />
-                      </button>
-                      {isActive && (
-                        <div className="px-3 pb-3 bg-muted/20">
-                          <SizeCategorySection
-                            categoryKey={key}
-                            sizes={cat.sizes}
-                            sizeQtys={sizeQtys}
-                            onQtyChange={handleQtyChange}
-                          />
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+            {lineItems.length > 0 && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium leading-none">Products & Quantities</label>
+                  {totalQty > 0 && (
+                    <span className="text-xs text-muted-foreground" data-testid="text-total-qty">
+                      Total: {totalQty} pcs
+                    </span>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  {lineItems.map((li) => (
+                    <LineItemSizeEntry
+                      key={li.id}
+                      lineItem={li}
+                      qtyMap={lineItemQtys[li.id] || {}}
+                      onQtyChange={(size, qty) => handleQtyChange(li.id, size, qty)}
+                      expanded={expandedItems.has(li.id)}
+                      onToggle={() => toggleItem(li.id)}
+                    />
+                  ))}
+                </div>
               </div>
-              {totalQty > 0 && (
-                <p className="text-xs text-muted-foreground" data-testid="text-total-qty">
-                  Total: {totalQty} item{totalQty !== 1 ? "s" : ""}
-                </p>
-              )}
-            </div>
+            )}
 
             <div className="space-y-2">
               <label className="text-sm font-medium leading-none">Additional Notes (optional)</label>
@@ -384,24 +438,26 @@ function ReorderModal({ order, open, onClose }: { order: PrintavoOrder | null; o
             </div>
           </div>
 
-          <DialogFooter className="mt-4">
-            <Button type="button" variant="outline" onClick={onClose} data-testid="button-cancel-reorder">
-              Cancel
-            </Button>
-            <Button type="submit" disabled={reorderMutation.isPending} data-testid="button-confirm-reorder">
-              {reorderMutation.isPending ? (
-                <>
-                  <Mail className="w-3.5 h-3.5 mr-1.5 animate-pulse" />
-                  Sending...
-                </>
-              ) : (
-                <>
-                  <Mail className="w-3.5 h-3.5 mr-1.5" />
-                  Send Reorder Request
-                </>
-              )}
-            </Button>
-          </DialogFooter>
+          <div className="px-6 pb-6 pt-4 border-t mt-2">
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={onClose} data-testid="button-cancel-reorder">
+                Cancel
+              </Button>
+              <Button type="submit" disabled={reorderMutation.isPending} data-testid="button-confirm-reorder">
+                {reorderMutation.isPending ? (
+                  <>
+                    <Mail className="w-3.5 h-3.5 mr-1.5 animate-pulse" />
+                    Sending...
+                  </>
+                ) : (
+                  <>
+                    <Mail className="w-3.5 h-3.5 mr-1.5" />
+                    Send Reorder Request
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
         </form>
       </DialogContent>
     </Dialog>
