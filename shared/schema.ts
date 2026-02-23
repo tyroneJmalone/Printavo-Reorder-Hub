@@ -1,18 +1,46 @@
-import { sql } from "drizzle-orm";
-import { pgTable, text, varchar } from "drizzle-orm/pg-core";
-import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-export const users = pgTable("users", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  username: text("username").notNull().unique(),
-  password: text("password").notNull(),
+export const printavoOrderSchema = z.object({
+  id: z.string(),
+  visualId: z.string().optional(),
+  orderNickname: z.string().optional().nullable(),
+  customerName: z.string().optional().nullable(),
+  customerEmail: z.string().optional().nullable(),
+  customerCompany: z.string().optional().nullable(),
+  status: z.string().optional().nullable(),
+  statusColor: z.string().optional().nullable(),
+  total: z.string().optional().nullable(),
+  dueDate: z.string().optional().nullable(),
+  customerDueDate: z.string().optional().nullable(),
+  createdAt: z.string().optional().nullable(),
+  publicUrl: z.string().optional().nullable(),
+  mockupUrl: z.string().optional().nullable(),
+  lineItemCount: z.number().optional(),
 });
 
-export const insertUserSchema = createInsertSchema(users).pick({
-  username: true,
-  password: true,
+export type PrintavoOrder = z.infer<typeof printavoOrderSchema>;
+
+export const printavoStatusSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  color: z.string().optional().nullable(),
 });
 
-export type InsertUser = z.infer<typeof insertUserSchema>;
-export type User = typeof users.$inferSelect;
+export type PrintavoStatus = z.infer<typeof printavoStatusSchema>;
+
+export const reorderRequestSchema = z.object({
+  orderId: z.string(),
+  visualId: z.string().optional(),
+  orderNickname: z.string().optional(),
+  customerName: z.string().optional(),
+  customerEmail: z.string(),
+  notes: z.string().optional(),
+});
+
+export type ReorderRequest = z.infer<typeof reorderRequestSchema>;
+
+export const customerLookupSchema = z.object({
+  email: z.string().email("Please enter a valid email address"),
+});
+
+export type CustomerLookup = z.infer<typeof customerLookupSchema>;
