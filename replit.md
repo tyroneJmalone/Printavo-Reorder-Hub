@@ -4,6 +4,7 @@
 A customer-facing reorder portal that integrates with Printavo (order management software) via their GraphQL API v2. Customers can look up their order history by email, view mockup images, open invoice details, and submit reorder requests that notify the sales team via email.
 
 ## Recent Changes
+- 2026-02-23: Line item detail enhancement - reorder modal now shows actual product line items with per-item size/qty entry, email includes product-specific breakdown
 - 2026-02-23: Initial build - Printavo API integration, Resend email, reorder portal UI
 
 ## Architecture
