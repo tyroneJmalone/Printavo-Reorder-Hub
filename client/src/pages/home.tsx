@@ -262,7 +262,7 @@ function ReorderModal({ order, open, onClose }: { order: PrintavoOrder | null; o
             </div>
 
             <div className="space-y-2">
-              <FormLabel>Additional Notes (optional)</FormLabel>
+              <label className="text-sm font-medium leading-none">Additional Notes (optional)</label>
               <Textarea
                 placeholder="Any changes or special instructions for this reorder..."
                 className="resize-none"
