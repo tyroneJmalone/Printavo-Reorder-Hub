@@ -148,7 +148,7 @@ export async function getOrdersBySearch(searchValue: string, searchType: "email"
           mockupUrl = liMockupUrl;
         }
 
-        const activeSizes = (li.sizes || []).filter((s: any) => s.count != null && s.count > 0);
+        const allSizes = (li.sizes || []).map((s: any) => ({ size: s.size, count: s.count || 0 }));
 
         lineItems.push({
           id: li.id,
@@ -159,7 +159,7 @@ export async function getOrdersBySearch(searchValue: string, searchType: "email"
           productName: li.product?.description || null,
           category: li.category?.name || null,
           totalQty: li.items || 0,
-          sizes: activeSizes.map((s: any) => ({ size: s.size, count: s.count })),
+          sizes: allSizes,
           mockupUrl: liMockupUrl,
         });
       }
