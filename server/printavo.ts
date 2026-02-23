@@ -52,7 +52,7 @@ export async function getStatuses() {
   return data.statuses?.nodes || [];
 }
 
-export async function getOrdersByCustomerEmail(email: string) {
+export async function getOrdersBySearch(searchValue: string, searchType: "email" | "company") {
   const gql = `
     query($searchQuery: String) {
       invoices(first: 25, sortOn: VISUAL_ID, sortDescending: true, query: $searchQuery) {
@@ -109,12 +109,17 @@ export async function getOrdersByCustomerEmail(email: string) {
     }
   `;
 
-  const data = await graphqlQuery(gql, { searchQuery: email });
+  const data = await graphqlQuery(gql, { searchQuery: searchValue });
   const allOrders = data.invoices?.nodes || [];
 
   const customerOrders = allOrders.filter((order: any) => {
-    const contactEmail = order.contact?.email?.toLowerCase();
-    return contactEmail === email.toLowerCase();
+    if (searchType === "email") {
+      const contactEmail = order.contact?.email?.toLowerCase();
+      return contactEmail === searchValue.toLowerCase();
+    } else {
+      const companyName = order.contact?.customer?.companyName?.toLowerCase() || "";
+      return companyName.includes(searchValue.toLowerCase());
+    }
   });
 
   return customerOrders.map((order: any) => {

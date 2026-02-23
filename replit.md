@@ -21,7 +21,7 @@ A customer-facing reorder portal that integrates with Printavo (order management
 
 ## API Routes
 - `GET /api/statuses` - Fetch all Printavo order statuses
-- `GET /api/orders/:email` - Fetch orders for a customer email
+- `GET /api/orders?q={searchValue}&type={email|company}` - Fetch orders by email or company name
 - `POST /api/reorder` - Send reorder notification email to sales team
 
 ## Configuration

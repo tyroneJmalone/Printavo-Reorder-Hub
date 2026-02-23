@@ -1,6 +1,6 @@
 import type { Express } from "express";
 import { type Server } from "http";
-import { getOrdersByCustomerEmail, getStatuses } from "./printavo";
+import { getOrdersBySearch, getStatuses } from "./printavo";
 import { sendReorderEmail } from "./email";
 import { reorderRequestSchema } from "@shared/schema";
 import { log } from "./index";
@@ -20,13 +20,17 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/orders/:email", async (req, res) => {
+  app.get("/api/orders", async (req, res) => {
     try {
-      const email = decodeURIComponent(req.params.email);
-      if (!email || !email.includes("@")) {
+      const searchValue = req.query.q as string;
+      const searchType = (req.query.type as string) === "company" ? "company" : "email";
+      if (!searchValue || searchValue.trim().length < 1) {
+        return res.status(400).json({ message: "Search value is required" });
+      }
+      if (searchType === "email" && !searchValue.includes("@")) {
         return res.status(400).json({ message: "Valid email is required" });
       }
-      const orders = await getOrdersByCustomerEmail(email);
+      const orders = await getOrdersBySearch(searchValue, searchType);
       res.json(orders);
     } catch (error: any) {
       log(`Error fetching orders: ${error.message}`, "api");

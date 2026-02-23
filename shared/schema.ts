@@ -40,7 +40,16 @@ export const reorderRequestSchema = z.object({
 export type ReorderRequest = z.infer<typeof reorderRequestSchema>;
 
 export const customerLookupSchema = z.object({
-  email: z.string().email("Please enter a valid email address"),
+  searchType: z.enum(["email", "company"]),
+  searchValue: z.string().min(1, "Please enter a search value"),
+}).refine((data) => {
+  if (data.searchType === "email") {
+    return z.string().email().safeParse(data.searchValue).success;
+  }
+  return data.searchValue.trim().length >= 2;
+}, {
+  message: "Please enter a valid email address or company name (at least 2 characters)",
+  path: ["searchValue"],
 });
 
 export type CustomerLookup = z.infer<typeof customerLookupSchema>;

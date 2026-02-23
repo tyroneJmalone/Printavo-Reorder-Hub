@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Search, RotateCcw, ExternalLink, Package, Mail, ArrowLeft, Filter, Image, CalendarDays, Hash, DollarSign } from "lucide-react";
+import { Search, RotateCcw, ExternalLink, Package, Mail, ArrowLeft, Filter, Image, CalendarDays, Hash, DollarSign, Building2 } from "lucide-react";
 
 function StatusFilterBar({ statuses, activeStatusIds, onToggle }: {
   statuses: PrintavoStatus[];
@@ -346,7 +346,7 @@ function ReorderModal({ order, open, onClose }: { order: PrintavoOrder | null; o
 
 export default function Home() {
   const { toast } = useToast();
-  const [customerEmail, setCustomerEmail] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState<{ value: string; type: "email" | "company" } | null>(null);
   const [activeStatusIds, setActiveStatusIds] = useState<Set<string>>(new Set());
   const [invoiceUrl, setInvoiceUrl] = useState<string | null>(null);
   const [reorderOrder, setReorderOrder] = useState<PrintavoOrder | null>(null);
@@ -354,12 +354,14 @@ export default function Home() {
 
   const lookupForm = useForm<CustomerLookup>({
     resolver: zodResolver(customerLookupSchema),
-    defaultValues: { email: "" },
+    defaultValues: { searchType: "email", searchValue: "" },
   });
+
+  const searchType = lookupForm.watch("searchType");
 
   const statusesQuery = useQuery<PrintavoStatus[]>({
     queryKey: ["/api/statuses"],
-    enabled: !!customerEmail,
+    enabled: !!searchQuery,
   });
 
   useEffect(() => {
@@ -370,8 +372,17 @@ export default function Home() {
   }, [statusesQuery.data, statusesInitialized]);
 
   const ordersQuery = useQuery<PrintavoOrder[]>({
-    queryKey: ["/api/orders", encodeURIComponent(customerEmail || "")],
-    enabled: !!customerEmail,
+    queryKey: ["/api/orders", searchQuery?.value, searchQuery?.type],
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        q: searchQuery!.value,
+        type: searchQuery!.type,
+      });
+      const res = await fetch(`/api/orders?${params}`);
+      if (!res.ok) throw new Error("Failed to fetch orders");
+      return res.json();
+    },
+    enabled: !!searchQuery,
   });
 
   const filteredOrders = ordersQuery.data?.filter((order) => {
@@ -381,7 +392,7 @@ export default function Home() {
   }) || [];
 
   const handleLookup = lookupForm.handleSubmit((data) => {
-    setCustomerEmail(data.email);
+    setSearchQuery({ value: data.searchValue, type: data.searchType });
     setStatusesInitialized(false);
     queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
   });
@@ -399,12 +410,12 @@ export default function Home() {
   };
 
   const handleBack = () => {
-    setCustomerEmail(null);
+    setSearchQuery(null);
     setStatusesInitialized(false);
     lookupForm.reset();
   };
 
-  if (!customerEmail) {
+  if (!searchQuery) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="w-full max-w-md space-y-8">
@@ -419,7 +430,7 @@ export default function Home() {
               Reorder Portal
             </p>
             <p className="text-sm text-muted-foreground max-w-sm mx-auto">
-              Enter your email address to view your order history and easily place a reorder.
+              Search by email or company name to view your order history and easily place a reorder.
             </p>
           </div>
 
@@ -427,20 +438,44 @@ export default function Home() {
             <CardContent className="pt-6">
               <form onSubmit={handleLookup} className="space-y-4">
                 <Form {...lookupForm}>
+                  <div className="flex gap-1 p-1 bg-muted rounded-lg" data-testid="search-type-toggle">
+                    <button
+                      type="button"
+                      onClick={() => { lookupForm.setValue("searchType", "email"); lookupForm.setValue("searchValue", ""); }}
+                      className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-md text-sm font-medium transition-all ${searchType === "email" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                      data-testid="toggle-email"
+                    >
+                      <Mail className="w-3.5 h-3.5" />
+                      Email
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { lookupForm.setValue("searchType", "company"); lookupForm.setValue("searchValue", ""); }}
+                      className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-md text-sm font-medium transition-all ${searchType === "company" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                      data-testid="toggle-company"
+                    >
+                      <Building2 className="w-3.5 h-3.5" />
+                      Company
+                    </button>
+                  </div>
                   <FormField
                     control={lookupForm.control}
-                    name="email"
+                    name="searchValue"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Email Address</FormLabel>
+                        <FormLabel>{searchType === "email" ? "Email Address" : "Company Name"}</FormLabel>
                         <FormControl>
                           <div className="relative">
-                            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                            {searchType === "email" ? (
+                              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                            ) : (
+                              <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                            )}
                             <Input
-                              placeholder="you@company.com"
+                              placeholder={searchType === "email" ? "you@company.com" : "Enter company name"}
                               className="pl-9"
                               {...field}
-                              data-testid="input-email"
+                              data-testid="input-search"
                             />
                           </div>
                         </FormControl>
@@ -471,13 +506,17 @@ export default function Home() {
             </Button>
             <div>
               <h1 className="font-semibold text-base" data-testid="text-dashboard-title">Your Orders</h1>
-              <p className="text-xs text-muted-foreground" data-testid="text-customer-email">{customerEmail}</p>
+              <p className="text-xs text-muted-foreground" data-testid="text-search-query">
+                {searchQuery.type === "email" ? searchQuery.value : `Company: ${searchQuery.value}`}
+              </p>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Badge variant="secondary" className="text-xs" data-testid="text-order-count">
-              {filteredOrders.length} order{filteredOrders.length !== 1 ? 's' : ''}
-            </Badge>
+            {!ordersQuery.isLoading && (
+              <Badge variant="secondary" className="text-xs" data-testid="text-order-count">
+                {filteredOrders.length} order{filteredOrders.length !== 1 ? 's' : ''}
+              </Badge>
+            )}
           </div>
         </div>
       </header>
