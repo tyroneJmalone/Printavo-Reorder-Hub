@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { customerLookupSchema, type CustomerLookup, type PrintavoOrder, type PrintavoStatus, type ReorderRequest } from "@shared/schema";
+import { customerLookupSchema, type CustomerLookup, type PrintavoOrder, type PrintavoStatus, type ReorderRequest, type SizeQuantity, SIZE_CATEGORIES } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Search, RotateCcw, ExternalLink, Package, Mail, ArrowLeft, Filter, Image, CalendarDays, Hash, DollarSign, Building2 } from "lucide-react";
+import { Search, RotateCcw, ExternalLink, Package, Mail, ArrowLeft, Filter, Image, CalendarDays, Hash, DollarSign, Building2, ChevronDown } from "lucide-react";
 
 function StatusFilterBar({ statuses, activeStatusIds, onToggle }: {
   statuses: PrintavoStatus[];
@@ -186,11 +186,50 @@ function OrderCardSkeleton() {
 }
 
 
+type CategoryKey = keyof typeof SIZE_CATEGORIES;
+
+function SizeCategorySection({ categoryKey, sizes, sizeQtys, onQtyChange }: {
+  categoryKey: string;
+  sizes: readonly string[];
+  sizeQtys: Record<string, number>;
+  onQtyChange: (size: string, qty: number) => void;
+}) {
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-2">
+      {sizes.map((size) => {
+        const shortLabel = size.replace(/^(Unisex|Youth|Ladies|Adult)\s+/, "");
+        return (
+          <div key={size} className="flex items-center gap-2">
+            <label className="text-xs text-muted-foreground w-10 shrink-0">{shortLabel}</label>
+            <Input
+              type="number"
+              min={0}
+              value={sizeQtys[size] || ""}
+              onChange={(e) => onQtyChange(size, parseInt(e.target.value) || 0)}
+              className="h-7 text-sm px-2 w-16"
+              placeholder="0"
+              data-testid={`input-qty-${size.replace(/\s+/g, "-").toLowerCase()}`}
+            />
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function ReorderModal({ order, open, onClose }: { order: PrintavoOrder | null; open: boolean; onClose: () => void }) {
   const { toast } = useToast();
-  const form = useForm<{ notes: string }>({
-    defaultValues: { notes: "" },
-  });
+  const [notes, setNotes] = useState("");
+  const [activeCategories, setActiveCategories] = useState<Set<CategoryKey>>(new Set());
+  const [sizeQtys, setSizeQtys] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    if (open) {
+      setNotes("");
+      setActiveCategories(new Set());
+      setSizeQtys({});
+    }
+  }, [open]);
 
   const reorderMutation = useMutation({
     mutationFn: async (data: ReorderRequest) => {
@@ -202,7 +241,6 @@ function ReorderModal({ order, open, onClose }: { order: PrintavoOrder | null; o
         title: "Reorder Request Sent",
         description: "Our sales team has been notified and will follow up with you shortly.",
       });
-      form.reset();
       onClose();
     },
     onError: (error: Error) => {
@@ -216,20 +254,55 @@ function ReorderModal({ order, open, onClose }: { order: PrintavoOrder | null; o
 
   if (!order) return null;
 
-  const handleSubmit = form.handleSubmit((data) => {
+  const toggleCategory = (key: CategoryKey) => {
+    setActiveCategories((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+        const catSizes = SIZE_CATEGORIES[key].sizes;
+        const newQtys = { ...sizeQtys };
+        catSizes.forEach((s) => delete newQtys[s]);
+        setSizeQtys(newQtys);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  };
+
+  const handleQtyChange = (size: string, qty: number) => {
+    setSizeQtys((prev) => {
+      if (qty <= 0) {
+        const next = { ...prev };
+        delete next[size];
+        return next;
+      }
+      return { ...prev, [size]: qty };
+    });
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const filledSizes: SizeQuantity[] = Object.entries(sizeQtys)
+      .filter(([, qty]) => qty > 0)
+      .map(([size, qty]) => ({ size, qty }));
+
     reorderMutation.mutate({
       orderId: order.id,
       visualId: order.visualId,
       orderNickname: order.orderNickname || undefined,
       customerName: order.customerName || undefined,
       customerEmail: order.customerEmail || "",
-      notes: data.notes,
+      notes: notes || undefined,
+      sizes: filledSizes.length > 0 ? filledSizes : undefined,
     });
-  });
+  };
+
+  const totalQty = Object.values(sizeQtys).reduce((sum, q) => sum + q, 0);
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md" data-testid="reorder-modal">
+      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto" data-testid="reorder-modal">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <RotateCcw className="w-4 h-4" />
@@ -261,13 +334,51 @@ function ReorderModal({ order, open, onClose }: { order: PrintavoOrder | null; o
               )}
             </div>
 
+            <div className="space-y-3">
+              <label className="text-sm font-medium leading-none">Sizes & Quantities (optional)</label>
+              <div className="space-y-2">
+                {(Object.entries(SIZE_CATEGORIES) as [CategoryKey, typeof SIZE_CATEGORIES[CategoryKey]][]).map(([key, cat]) => {
+                  const isActive = activeCategories.has(key);
+                  return (
+                    <div key={key} className="rounded-md border overflow-hidden">
+                      <button
+                        type="button"
+                        onClick={() => toggleCategory(key)}
+                        className={`w-full flex items-center justify-between px-3 py-2.5 text-sm font-medium transition-colors ${isActive ? "bg-primary/5 text-foreground" : "bg-background text-muted-foreground hover:bg-muted/50"}`}
+                        data-testid={`toggle-category-${key}`}
+                      >
+                        <span>{cat.label}</span>
+                        <ChevronDown className={`w-4 h-4 transition-transform ${isActive ? "rotate-180" : ""}`} />
+                      </button>
+                      {isActive && (
+                        <div className="px-3 pb-3 bg-muted/20">
+                          <SizeCategorySection
+                            categoryKey={key}
+                            sizes={cat.sizes}
+                            sizeQtys={sizeQtys}
+                            onQtyChange={handleQtyChange}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              {totalQty > 0 && (
+                <p className="text-xs text-muted-foreground" data-testid="text-total-qty">
+                  Total: {totalQty} item{totalQty !== 1 ? "s" : ""}
+                </p>
+              )}
+            </div>
+
             <div className="space-y-2">
               <label className="text-sm font-medium leading-none">Additional Notes (optional)</label>
               <Textarea
                 placeholder="Any changes or special instructions for this reorder..."
                 className="resize-none"
                 rows={3}
-                {...form.register("notes")}
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
                 data-testid="reorder-notes"
               />
             </div>

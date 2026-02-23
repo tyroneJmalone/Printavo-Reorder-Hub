@@ -81,6 +81,25 @@ export async function sendReorderEmail(request: ReorderRequest) {
               <td style="padding: 8px 0; font-weight: 600; font-size: 14px;">${request.customerEmail}</td>
             </tr>
             ${
+              request.sizes && request.sizes.length > 0
+                ? `<tr>
+              <td style="padding: 8px 0; color: #64748b; font-size: 14px; vertical-align: top;">Sizes</td>
+              <td style="padding: 8px 0; font-size: 14px;">
+                <table style="border-collapse: collapse; width: 100%;">
+                  ${request.sizes.map(s => `<tr>
+                    <td style="padding: 2px 12px 2px 0; font-size: 13px;">${s.size}</td>
+                    <td style="padding: 2px 0; font-size: 13px; font-weight: 600;">× ${s.qty}</td>
+                  </tr>`).join("")}
+                  <tr style="border-top: 1px solid #e2e8f0;">
+                    <td style="padding: 6px 12px 2px 0; font-size: 13px; font-weight: 600;">Total</td>
+                    <td style="padding: 6px 0 2px; font-size: 13px; font-weight: 600;">× ${request.sizes.reduce((sum, s) => sum + s.qty, 0)}</td>
+                  </tr>
+                </table>
+              </td>
+            </tr>`
+                : ""
+            }
+            ${
               request.notes
                 ? `<tr>
               <td style="padding: 8px 0; color: #64748b; font-size: 14px; vertical-align: top;">Notes</td>

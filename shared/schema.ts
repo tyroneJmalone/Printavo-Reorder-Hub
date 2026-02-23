@@ -28,6 +28,13 @@ export const printavoStatusSchema = z.object({
 
 export type PrintavoStatus = z.infer<typeof printavoStatusSchema>;
 
+export const sizeQuantitySchema = z.object({
+  size: z.string(),
+  qty: z.number().min(0),
+});
+
+export type SizeQuantity = z.infer<typeof sizeQuantitySchema>;
+
 export const reorderRequestSchema = z.object({
   orderId: z.string(),
   visualId: z.string().optional(),
@@ -35,9 +42,29 @@ export const reorderRequestSchema = z.object({
   customerName: z.string().optional(),
   customerEmail: z.string(),
   notes: z.string().optional(),
+  sizes: z.array(sizeQuantitySchema).optional(),
 });
 
 export type ReorderRequest = z.infer<typeof reorderRequestSchema>;
+
+export const SIZE_CATEGORIES = {
+  unisex: {
+    label: "Unisex",
+    sizes: ["Unisex XS", "Unisex S", "Unisex M", "Unisex L", "Unisex XL", "Unisex XXL"],
+  },
+  youth: {
+    label: "Youth",
+    sizes: ["Youth XS", "Youth S", "Youth M", "Youth L", "Youth XL"],
+  },
+  ladies: {
+    label: "Ladies",
+    sizes: ["Ladies XS", "Ladies S", "Ladies M", "Ladies L", "Ladies XL", "Ladies XXL"],
+  },
+  other: {
+    label: "Caps/Bags/Etc",
+    sizes: ["Adult XXL", "One Size"],
+  },
+} as const;
 
 export const customerLookupSchema = z.object({
   searchType: z.enum(["email", "company"]),
