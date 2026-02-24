@@ -272,7 +272,7 @@ function LineItemSizeEntry({ lineItem, qtyMap, onQtyChange, expanded, onToggle, 
                     value={qtyMap[s.size] || ""}
                     onChange={(e) => onQtyChange(s.size, parseInt(e.target.value) || 0)}
                     className="h-7 text-sm px-2 w-14 text-center"
-                    placeholder={s.count ? String(s.count) : "0"}
+                    placeholder="0"
                     data-testid={`input-qty-${lineItem.id}-${s.size}`}
                   />
                   {s.count != null && s.count > 0 && (
@@ -291,7 +291,7 @@ function LineItemSizeEntry({ lineItem, qtyMap, onQtyChange, expanded, onToggle, 
                   value={qtyMap["qty"] || ""}
                   onChange={(e) => onQtyChange("qty", parseInt(e.target.value) || 0)}
                   className="h-7 text-sm px-2 w-20"
-                  placeholder={lineItem.totalQty ? String(lineItem.totalQty) : "0"}
+                  placeholder="0"
                   data-testid={`input-qty-${lineItem.id}-qty`}
                 />
               </div>
