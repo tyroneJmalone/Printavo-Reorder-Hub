@@ -165,6 +165,36 @@ export async function getOrdersBySearch(searchValue: string, searchType: "email"
       }
     }
 
+    const dedupedLineItems: any[] = [];
+    const seenKeys = new Map<string, number>();
+    for (const li of lineItems) {
+      const key = [
+        (li.itemNumber || "").toLowerCase().trim(),
+        (li.color || "").toLowerCase().trim(),
+        (li.description || li.productName || "").toLowerCase().trim(),
+      ].join("|||");
+
+      const existingIdx = seenKeys.get(key);
+      if (existingIdx !== undefined && key !== "||||||") {
+        const existing = dedupedLineItems[existingIdx];
+        existing.totalQty = (existing.totalQty || 0) + (li.totalQty || 0);
+        for (const s of (li.sizes || [])) {
+          const match = (existing.sizes || []).find((es: any) => es.size === s.size);
+          if (match) {
+            match.count = (match.count || 0) + (s.count || 0);
+          } else {
+            existing.sizes = [...(existing.sizes || []), s];
+          }
+        }
+        if (!existing.mockupUrl && li.mockupUrl) {
+          existing.mockupUrl = li.mockupUrl;
+        }
+      } else {
+        seenKeys.set(key, dedupedLineItems.length);
+        dedupedLineItems.push({ ...li });
+      }
+    }
+
     return {
       id: order.id,
       visualId: order.visualId,
@@ -180,8 +210,8 @@ export async function getOrdersBySearch(searchValue: string, searchType: "email"
       createdAt: order.createdAt,
       publicUrl: order.publicUrl || null,
       mockupUrl,
-      lineItemCount: lineItems.length,
-      lineItems,
+      lineItemCount: dedupedLineItems.length,
+      lineItems: dedupedLineItems,
     };
   });
 }
