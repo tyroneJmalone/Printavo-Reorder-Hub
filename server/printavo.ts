@@ -211,6 +211,7 @@ export async function getOrdersBySearch(searchValue: string, searchType: "email"
       publicUrl: order.publicUrl || null,
       mockupUrl,
       lineItemCount: dedupedLineItems.length,
+      orderTotalQty: dedupedLineItems.reduce((sum: number, li: any) => sum + (li.totalQty || 0), 0),
       lineItems: dedupedLineItems,
     };
   });

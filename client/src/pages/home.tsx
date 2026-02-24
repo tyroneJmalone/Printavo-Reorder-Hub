@@ -123,7 +123,13 @@ function OrderCard({ order, onReorder }: {
               {order.lineItemCount !== undefined && order.lineItemCount > 0 && (
                 <div className="flex items-center gap-1.5">
                   <Package className="w-3.5 h-3.5" />
-                  <span>{order.lineItemCount} item{order.lineItemCount !== 1 ? 's' : ''}</span>
+                  <span>{order.lineItemCount} product{order.lineItemCount !== 1 ? 's' : ''}</span>
+                </div>
+              )}
+              {order.orderTotalQty !== undefined && order.orderTotalQty > 0 && (
+                <div className="flex items-center gap-1.5">
+                  <Hash className="w-3.5 h-3.5" />
+                  <span data-testid={`order-totalqty-${order.visualId}`}>{order.orderTotalQty} pcs total</span>
                 </div>
               )}
             </div>
@@ -421,6 +427,12 @@ function ReorderModal({ order, open, onClose }: { order: PrintavoOrder | null; o
                 <div className="flex justify-between gap-2">
                   <span className="text-muted-foreground">Customer</span>
                   <span className="font-medium">{order.customerName}</span>
+                </div>
+              )}
+              {order.orderTotalQty !== undefined && order.orderTotalQty > 0 && (
+                <div className="flex justify-between gap-2">
+                  <span className="text-muted-foreground">Total Qty</span>
+                  <span className="font-medium" data-testid="text-order-total-qty">{order.orderTotalQty} pcs</span>
                 </div>
               )}
             </div>

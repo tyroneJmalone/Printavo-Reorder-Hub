@@ -36,6 +36,7 @@ export const printavoOrderSchema = z.object({
   publicUrl: z.string().optional().nullable(),
   mockupUrl: z.string().optional().nullable(),
   lineItemCount: z.number().optional(),
+  orderTotalQty: z.number().optional(),
   lineItems: z.array(lineItemSchema).optional(),
 });
 
