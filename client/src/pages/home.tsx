@@ -225,7 +225,7 @@ function LineItemSizeEntry({ lineItem, qtyMap, onQtyChange, expanded, onToggle, 
                   <img
                     src={mockupSrc}
                     alt={productLabel}
-                    className="w-[28rem] h-[28rem] rounded object-contain"
+                    className="w-[56rem] h-[56rem] max-w-[90vw] max-h-[90vh] rounded object-contain"
                   />
                 </div>
               </div>
