@@ -6,3 +6,18 @@ id = "a_CfSWO0hnWSknwFgdw45"
 uri = "file://AGENT_HANDOFF.md"
 type = "text"
 title = "Agent Handoff Documentation"
+logical_id = "f8f04766-8b96-4855-82cb-808ffce94d2b"
+
+[[outputs]]
+id = "LlJCgjB7olexFOiqcLq1m"
+uri = "file://CLIENT_PORTAL_BRAINSTORM.md"
+type = "text"
+title = "Client Portal Brainstorm"
+description = "Shareable context and planning brief for secure customer and order-specific reorder portal links."
+logical_id = "a7781054-7d13-4988-ad2e-b95c4ea90e83"
+content_hash = "sha256:101e207af7a6547ea788ca9efe40aaee269b79281b24ac44ca100f22b6494006"
+size = 9692
+mtime_ms = 1788236862840
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:34c45ffd-6b62-4b21-a651-ee45dfe0c838/a7781054-7d13-4988-ad2e-b95c4ea90e83/cb97ec92-766b-4d40-a4b0-cb208619a955"
+storage_version_token = "1788236867124584"
+content_type = "text/markdown"
